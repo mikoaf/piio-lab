@@ -1,0 +1,14 @@
+# Runtime data
+logs/
+recordings/
+*.partial
+
+# Build output
+dist/
+/piio-lab
+*.exe
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store

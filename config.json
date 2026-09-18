@@ -1,0 +1,26 @@
+{
+  "monitor_interval_ms": 2000,
+  "printer": {
+    "vendor_id": "04b8",
+    "product_id": "0e27",
+    "name_contains": ["epson", "tm-t82"]
+  },
+  "scanner": {
+    "mode": "keyboard",
+    "baud_rate": 115200,
+    "vendor_id": "23d0",
+    "product_id": "0ce0",
+    "name_contains": ["honeywell", "hf600g2", "hf680"]
+  },
+  "audio": {
+    "vendor_id": "0d8c",
+    "product_id": "0014",
+    "name_contains": ["c-media", "usb audio", "audio adapter", "unitek"]
+  },
+  "esp32": {
+    "baud_rate": 115200,
+    "vendor_id": "303a",
+    "product_id": "1001",
+    "name_contains": ["esp32", "espressif", "cp210", "ch340", "ch341", "usb serial", "uart", "jtag"]
+  }
+}
