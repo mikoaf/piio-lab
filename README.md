@@ -8,14 +8,14 @@ menginisialisasi ulang perangkat USB pada Raspberry Pi.
 - [Overview Sistem](#overview-sistem)
 - [Arsitektur Sistem](#arsitektur-sistem)
 - [Struktur Aplikasi / Source Code](#struktur-aplikasi--source-code)
-- [Database](#database-kalau-ada)
-- [API Documentation](#api-documentation-kalau-ada)
-- [Business Logic & Data Flow](#business-logic--data-flow-kalau-ada)
-- [Authentication & Security](#authentication--security-kalau-ada)
+- [Database](#database)
+- [API Documentation](#api-documentation)
+- [Business Logic & Data Flow](#business-logic--data-flow)
+- [Authentication & Security](#authentication--security)
 - [Installation & Configuration](#installation--configuration)
 - [Deployment](#deployment-kalau-ada)
 - [Logging](#logging)
-- [Testing](#testing-kalau-ada)
+- [Testing](#testing)
 
 ## Overview Sistem
 
@@ -235,15 +235,16 @@ jangan membagikan file log tanpa pemeriksaan.
 
 - Raspberry Pi 4.
 - Raspberry Pi OS berbasis Linux, 32-bit atau 64-bit.
-- Go 1.22 atau lebih baru.
 - Paket `alsa-utils` untuk `arecord`.
 - USB Sound Card dengan microphone input untuk BOYA BY-MM1+.
+- Go 1.22 atau lebih baru hanya diperlukan untuk instalasi dari source atau
+  melakukan build sendiri. Instalasi binary release tidak memerlukan Go.
 
-### Instalasi paket
+### Persiapan sistem
 
 ```sh
 sudo apt update
-sudo apt install golang alsa-utils
+sudo apt install curl alsa-utils
 sudo usermod -aG lp,input,audio,dialout "$USER"
 sudo modprobe usblp
 sudo reboot
@@ -259,6 +260,74 @@ ls -l /dev/input/by-id/
 ls -l /dev/serial/by-id/
 ls -l /dev/snd/
 ```
+
+### Instalasi melalui binary release (direkomendasikan)
+
+Metode ini tidak memerlukan Git atau Go. Tentukan arsitektur Raspberry Pi:
+
+```sh
+uname -m
+```
+
+| Hasil | Paket release |
+| --- | --- |
+| `aarch64` | `linux-arm64` |
+| `armv7l` atau `armv6l` | `linux-armv7` |
+
+Untuk Raspberry Pi OS 64-bit:
+
+```sh
+mkdir -p ~/piio-lab
+cd ~/piio-lab
+
+PIIO_VERSION=v0.1.0
+PIIO_ARCH=linux-arm64
+
+curl -fLO "https://github.com/octarudin/piio-lab/releases/download/${PIIO_VERSION}/piio-lab-${PIIO_VERSION}-${PIIO_ARCH}.tar.gz"
+curl -fLO "https://github.com/octarudin/piio-lab/releases/download/${PIIO_VERSION}/SHA256SUMS.txt"
+
+sha256sum -c SHA256SUMS.txt --ignore-missing
+tar -xzf "piio-lab-${PIIO_VERSION}-${PIIO_ARCH}.tar.gz"
+chmod +x piio-lab
+```
+
+Untuk Raspberry Pi OS 32-bit, gunakan:
+
+```sh
+PIIO_ARCH=linux-armv7
+```
+
+Pastikan hasil verifikasi checksum menunjukkan `OK`. Isi hasil ekstraksi:
+
+```text
+piio-lab
+config.json
+README.md
+```
+
+Jalankan binary dari direktori yang berisi `config.json`:
+
+```sh
+cd ~/piio-lab
+./piio-lab
+```
+
+### Instalasi melalui Git/source code
+
+Metode ini ditujukan untuk development atau ketika aplikasi ingin dikompilasi
+langsung pada Raspberry Pi:
+
+```sh
+sudo apt install git golang
+cd ~
+git clone https://github.com/octarudin/piio-lab.git
+cd piio-lab
+go test ./...
+go run main.go
+```
+
+Seluruh folder proyek harus tersedia. `main.go` mengimpor package dalam
+direktori `internal/`, sehingga file tersebut tidak dapat disalin sendirian.
 
 ### Konfigurasi perangkat
 
@@ -293,17 +362,23 @@ Setelah scanner dikonfigurasi sebagai USB Serial/COM:
 Interval pemeriksaan cadangan ditentukan oleh `monitor_interval_ms`. Kernel
 event tetap menjadi mekanisme utama; polling digunakan sebagai cadangan.
 
-### Menjalankan
+### Menjalankan setelah instalasi
+
+Binary release:
+
+```sh
+cd ~/piio-lab
+./piio-lab
+```
+
+Source code:
 
 ```sh
 cd ~/piio-lab
 go run main.go
 ```
 
-Seluruh folder proyek harus tersedia. Jangan menyalin `main.go` saja karena file
-tersebut mengimpor package di dalam direktori `internal/`.
-
-## Deployment
+## Deployment (Kalau ada)
 
 Untuk penggunaan tanpa `go run`, build binary langsung pada Raspberry Pi:
 
