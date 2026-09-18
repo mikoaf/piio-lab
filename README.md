@@ -378,7 +378,7 @@ cd ~/piio-lab
 go run main.go
 ```
 
-## Deployment (Kalau ada)
+## Deployment
 
 Untuk penggunaan tanpa `go run`, build binary langsung pada Raspberry Pi:
 
