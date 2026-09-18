@@ -13,7 +13,7 @@ menginisialisasi ulang perangkat USB pada Raspberry Pi.
 - [Business Logic & Data Flow](#business-logic--data-flow)
 - [Authentication & Security](#authentication--security)
 - [Installation & Configuration](#installation--configuration)
-- [Deployment](#deployment-kalau-ada)
+- [Deployment](#deployment)
 - [Logging](#logging)
 - [Testing](#testing)
 
