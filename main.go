@@ -51,18 +51,24 @@ func run() error {
 	fmt.Printf("%s - Raspberry Pi Peripheral Tester\n\n", appName)
 
 	repository := linuxio.USBRepository{}
-	initializer := linuxio.Initializer{Config: cfg}
+	printer := &linuxio.Printer{}
+	initializer := linuxio.Initializer{Config: cfg, Printer: printer}
 	events := linuxio.EventWatcher{Logger: logger}
 	manager := application.NewManager(cfg, logger, repository, initializer, events)
 	logger.Println("[START] PiIO Lab dimulai")
 	manager.InitializeAll()
 
-	interfaceCLI, err := cli.New(cfg, manager, logger)
+	interfaceCLI, err := cli.New(manager, logger)
 	if err != nil {
 		return err
 	}
 	go manager.Monitor(ctx)
-	return interfaceCLI.Run(ctx)
+	background := application.NewBackground(cfg, manager, linuxio.Gateway{Printer: printer}, logger)
+	background.Start(ctx)
+	err = interfaceCLI.Run(ctx)
+	cancel()
+	background.Wait()
+	return err
 }
 
 func newLogger() (*log.Logger, func(), error) {

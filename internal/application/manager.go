@@ -154,6 +154,9 @@ func (m *Manager) initializeWithRetry(state domain.DeviceState, attempts int, de
 		if state.Ready {
 			return state
 		}
+		if state.Err == domain.ErrPaperOut.Error() {
+			return state
+		}
 	}
 	return state
 }
@@ -182,6 +185,13 @@ func (m *Manager) setState(state domain.DeviceState) {
 
 func (m *Manager) OperationError(role string, err error) {
 	m.logger.Printf("[READ ERROR] %s: %v", strings.ToUpper(role), err)
+	state := m.State(role)
+	state.Ready = false
+	state.Err = err.Error()
+	m.setState(state)
+}
+
+func (m *Manager) MarkNotReady(role string, err error) {
 	state := m.State(role)
 	state.Ready = false
 	state.Err = err.Error()
@@ -244,6 +254,12 @@ func (m *Manager) refresh() {
 			m.setState(fresh)
 			if fresh.Ready {
 				m.logReinit(fresh)
+			}
+		case old.Connected && fresh.Connected && old.Ready:
+			checked := m.initializer.Check(old)
+			if !checked.Ready {
+				m.setState(checked)
+				m.logger.Printf("[NOT READY] %s: %s", strings.ToUpper(role), checked.Err)
 			}
 		}
 	}

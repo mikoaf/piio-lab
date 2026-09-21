@@ -2,7 +2,9 @@ package domain
 
 import (
 	"context"
+	"errors"
 	"strings"
+	"time"
 )
 
 const (
@@ -13,6 +15,8 @@ const (
 )
 
 var Roles = []string{RolePrinter, RoleScanner, RoleAudio, RoleESP32}
+
+var ErrPaperOut = errors.New("kertas thermal habis atau tidak terpasang")
 
 type Selector struct {
 	VendorID     string   `json:"vendor_id"`
@@ -90,6 +94,13 @@ type USBRepository interface {
 
 type DeviceInitializer interface {
 	Initialize(DeviceState) DeviceState
+	Check(DeviceState) DeviceState
+}
+
+type PeripheralGateway interface {
+	ListenKeyboard(ctx context.Context, node string, emit func(string)) error
+	ListenSerial(ctx context.Context, node string, baudRate int, emit func(string)) error
+	PrintQR(node, value string, now time.Time) error
 }
 
 type USBEventWatcher interface {
