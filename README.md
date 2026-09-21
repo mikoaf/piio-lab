@@ -443,6 +443,26 @@ Untuk Linux x86-64:
 GOOS=linux GOARCH=amd64 go build -o dist/piio-lab-amd64 main.go
 ```
 
+### Membuat aset GitHub Release
+
+PowerShell script yang tersedia akan membangun target ARM64, ARMv7, dan AMD64,
+membuat archive `.tar.gz`, serta menghasilkan `SHA256SUMS.txt`. Jalankan dari
+root repository pada commit yang sudah diberi tag:
+
+```powershell
+.\scripts\build-release.ps1
+```
+
+Versi secara default diambil dari tag yang tepat menunjuk ke `HEAD`. Versi juga
+dapat diberikan secara eksplisit:
+
+```powershell
+.\scripts\build-release.ps1 v0.2.0
+```
+
+Seluruh file yang perlu diunggah ke GitHub Release tersedia di direktori
+`dist/`.
+
 Salin binary dan `config.json` ke direktori yang sama. Aplikasi bersifat
 interaktif, sehingga lebih sesuai dijalankan dari terminal lokal atau SSH.
 Menjalankannya sebagai service background tidak direkomendasikan tanpa membuat
