@@ -1,7 +1,8 @@
 # PiIO Lab
 
 PiIO Lab adalah aplikasi CLI berbasis Go untuk menguji, memantau, dan
-menginisialisasi ulang perangkat USB pada Raspberry Pi.
+menginisialisasi ulang perangkat USB pada Raspberry Pi maupun komputer Linux
+x86-64.
 
 ## Daftar Isi
 
@@ -19,8 +20,9 @@ menginisialisasi ulang perangkat USB pada Raspberry Pi.
 
 ## Overview Sistem
 
-Sistem dirancang untuk Raspberry Pi 4 dan Raspberry Pi OS. Perangkat yang
-didukung oleh konfigurasi bawaan adalah:
+Target utama sistem adalah Raspberry Pi 4 dan Raspberry Pi OS, dengan dukungan
+tambahan untuk Linux x86-64 (`amd64`). Perangkat yang didukung oleh konfigurasi
+bawaan adalah:
 
 | Perangkat | Interface | Fungsi |
 | --- | --- | --- |
@@ -261,8 +263,8 @@ jangan membagikan file log tanpa pemeriksaan.
 
 ### Prasyarat
 
-- Raspberry Pi 4.
-- Raspberry Pi OS berbasis Linux, 32-bit atau 64-bit.
+- Raspberry Pi 4 dengan Raspberry Pi OS 32-bit/64-bit, atau komputer Linux
+  x86-64 (`amd64`).
 - Paket `alsa-utils` untuk `arecord`.
 - USB Sound Card dengan microphone input untuk BOYA BY-MM1+.
 - Go 1.22 atau lebih baru hanya diperlukan untuk instalasi dari source atau
@@ -291,7 +293,7 @@ ls -l /dev/snd/
 
 ### Instalasi melalui binary release (direkomendasikan)
 
-Metode ini tidak memerlukan Git atau Go. Tentukan arsitektur Raspberry Pi:
+Metode ini tidak memerlukan Git atau Go. Tentukan arsitektur sistem Linux:
 
 ```sh
 uname -m
@@ -300,15 +302,16 @@ uname -m
 | Hasil | Paket release |
 | --- | --- |
 | `aarch64` | `linux-arm64` |
-| `armv7l` atau `armv6l` | `linux-armv7` |
+| `armv7l` | `linux-armv7` |
+| `x86_64` | `linux-amd64` |
 
-Untuk Raspberry Pi OS 64-bit:
+Contoh berikut menggunakan paket Raspberry Pi OS 64-bit:
 
 ```sh
 mkdir -p ~/piio-lab
 cd ~/piio-lab
 
-PIIO_VERSION=v0.1.0
+PIIO_VERSION=v0.2.0
 PIIO_ARCH=linux-arm64
 
 curl -fLO "https://github.com/octarudin/piio-lab/releases/download/${PIIO_VERSION}/piio-lab-${PIIO_VERSION}-${PIIO_ARCH}.tar.gz"
@@ -323,6 +326,12 @@ Untuk Raspberry Pi OS 32-bit, gunakan:
 
 ```sh
 PIIO_ARCH=linux-armv7
+```
+
+Untuk Linux x86-64, gunakan:
+
+```sh
+PIIO_ARCH=linux-amd64
 ```
 
 Pastikan hasil verifikasi checksum menunjukkan `OK`. Isi hasil ekstraksi:
@@ -343,7 +352,7 @@ cd ~/piio-lab
 ### Instalasi melalui Git/source code
 
 Metode ini ditujukan untuk development atau ketika aplikasi ingin dikompilasi
-langsung pada Raspberry Pi:
+langsung pada sistem Linux yang didukung:
 
 ```sh
 sudo apt install git golang
@@ -416,7 +425,7 @@ go build -o piio-lab main.go
 ./piio-lab
 ```
 
-Cross-compile dari Linux untuk Raspberry Pi OS 64-bit:
+Cross-compile untuk Raspberry Pi OS 64-bit:
 
 ```sh
 GOOS=linux GOARCH=arm64 go build -o dist/piio-lab-arm64 main.go
@@ -426,6 +435,12 @@ Untuk Raspberry Pi OS 32-bit:
 
 ```sh
 GOOS=linux GOARCH=arm GOARM=7 go build -o dist/piio-lab-armv7 main.go
+```
+
+Untuk Linux x86-64:
+
+```sh
+GOOS=linux GOARCH=amd64 go build -o dist/piio-lab-amd64 main.go
 ```
 
 Salin binary dan `config.json` ke direktori yang sama. Aplikasi bersifat
@@ -492,11 +507,12 @@ Pengujian integrasi perangkat dilakukan langsung pada Raspberry Pi dengan
 mencabut dan memasang ulang setiap USB, lalu memastikan transisi
 `DISCONNECTED → CONNECTED → REINITIALIZING → READY` tercatat.
 
-Build ARM dapat diverifikasi dengan:
+Build untuk seluruh target release dapat diverifikasi dengan:
 
 ```sh
 GOOS=linux GOARCH=arm64 go build -o /tmp/piio-arm64 main.go
 GOOS=linux GOARCH=arm GOARM=7 go build -o /tmp/piio-armv7 main.go
+GOOS=linux GOARCH=amd64 go build -o /tmp/piio-amd64 main.go
 ```
 
 ## Catatan Operasional
