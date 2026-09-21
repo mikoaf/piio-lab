@@ -8,12 +8,14 @@ import (
 	"path/filepath"
 	"sort"
 	"syscall"
-	"time"
 
 	"piio-lab/internal/domain"
 )
 
-type Initializer struct{ Config domain.Config }
+type Initializer struct {
+	Config  domain.Config
+	Printer *Printer
+}
 
 func (i Initializer) Initialize(s domain.DeviceState) domain.DeviceState {
 	if !s.Connected {
@@ -27,7 +29,11 @@ func (i Initializer) Initialize(s domain.DeviceState) domain.DeviceState {
 		if err != nil {
 			err = errors.New("node printer belum tersedia; cek modul usblp dan /dev/usb/lp*")
 		} else {
-			err = InitializePrinter(s.Node)
+			if i.Printer == nil {
+				err = errors.New("adapter printer belum dikonfigurasi")
+			} else {
+				err = i.Printer.Initialize(s.Node)
+			}
 		}
 	case domain.RoleScanner:
 		kind := "input"
@@ -66,6 +72,20 @@ func (i Initializer) Initialize(s domain.DeviceState) domain.DeviceState {
 	return s
 }
 
+func (i Initializer) Check(s domain.DeviceState) domain.DeviceState {
+	if !s.Connected || s.Role != domain.RolePrinter || i.Printer == nil {
+		return s
+	}
+	if err := i.Printer.Check(s.Node); err != nil {
+		s.Ready = false
+		s.Err = err.Error()
+		return s
+	}
+	s.Ready = true
+	s.Err = ""
+	return s
+}
+
 func firstNode(nodes []string) (string, error) {
 	if len(nodes) == 0 {
 		return "", errors.New("node Linux belum tersedia")
@@ -80,35 +100,6 @@ func ProbeReadable(path string) error {
 		return fmt.Errorf("tidak dapat membuka %s: %w", path, err)
 	}
 	return f.Close()
-}
-
-func InitializePrinter(path string) error {
-	f, err := os.OpenFile(path, os.O_WRONLY|syscall.O_NONBLOCK, 0)
-	if err != nil {
-		return fmt.Errorf("tidak dapat membuka %s: %w", path, err)
-	}
-	defer f.Close()
-	if _, err := f.Write([]byte{0x1b, 0x40}); err != nil {
-		return fmt.Errorf("inisialisasi ESC/POS gagal: %w", err)
-	}
-	return nil
-}
-
-func PrintTestReceipt(path string, now time.Time) error {
-	f, err := os.OpenFile(path, os.O_WRONLY, 0)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	data := []byte{0x1b, 0x40, 0x1b, 0x61, 0x01, 0x1b, 0x45, 0x01}
-	data = append(data, []byte("PiIO Lab\n")...)
-	data = append(data, 0x1b, 0x45, 0x00)
-	data = append(data, []byte("EPSON TM-T82X Test\n"+now.Format("2006-01-02 15:04:05")+"\n\n")...)
-	data = append(data, 0x1b, 0x61, 0x00)
-	data = append(data, []byte("Printer USB berfungsi.\n\n\n")...)
-	data = append(data, 0x1d, 0x56, 0x00)
-	_, err = f.Write(data)
-	return err
 }
 
 func ALSADeviceFromNode(node string) (string, error) {

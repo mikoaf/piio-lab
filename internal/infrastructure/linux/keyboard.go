@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"syscall"
 	"time"
@@ -46,25 +47,31 @@ func CloseKeyboard(f *os.File) {
 	_ = f.Close()
 }
 
-func ReadKeyboardEvents(ctx context.Context, f *os.File, emit func(string)) {
+func ReadKeyboardEvents(ctx context.Context, f *os.File, emit func(string)) error {
 	size := int(unsafe.Sizeof(inputEvent{}))
 	buf := make([]byte, size)
 	var text bytes.Buffer
 	shift := false
 	if err := syscall.SetNonblock(int(f.Fd()), true); err != nil {
-		return
+		return err
 	}
 	for ctx.Err() == nil {
 		ready, err := DescriptorReadable(int(f.Fd()), 25*time.Millisecond)
-		if err != nil || !ready {
+		if err != nil {
+			return err
+		}
+		if !ready {
 			continue
 		}
 		n, err := syscall.Read(int(f.Fd()), buf)
+		if n == 0 && err == nil {
+			return io.EOF
+		}
 		if err != nil {
 			if errors.Is(err, syscall.EAGAIN) || errors.Is(err, syscall.EWOULDBLOCK) {
 				continue
 			}
-			return
+			return err
 		}
 		if n != size {
 			continue
@@ -91,6 +98,7 @@ func ReadKeyboardEvents(ctx context.Context, f *os.File, emit func(string)) {
 			text.WriteByte(ch)
 		}
 	}
+	return nil
 }
 
 func KeyCharacter(code uint16, shift bool) (byte, bool) {
