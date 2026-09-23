@@ -1,0 +1,40 @@
+{
+  "listen": "0.0.0.0:8080",
+  "tls_cert": "",
+  "tls_key": "",
+  "audio": {
+    "enabled": true,
+    "input_device": -1,
+    "output_device": -1,
+    "sample_rate": 48000,
+    "frame_size": 480,
+    "channels": 1,
+    "input_gain": 1,
+    "output_gain": 1
+  },
+  "printer": {
+    "enabled": true,
+    "vendor_id": "04b8",
+    "product_id": "0e27",
+    "configuration": 1,
+    "interface": 0,
+    "alternate": 0,
+    "endpoint": 1
+  },
+  "scanner": {
+    "enabled": true,
+    "vendor_id": "23d0",
+    "product_id": "0ce0",
+    "configuration": 1,
+    "interface": 0,
+    "alternate": 0,
+    "endpoint": 1
+  },
+  "auto_print_qr": true,
+  "sti": {
+    "enabled": false,
+    "port": "/dev/serial/by-id/REPLACE_WITH_STI",
+    "key_env": "PIIO_STI_KEY",
+    "poll_ms": 500
+  }
+}

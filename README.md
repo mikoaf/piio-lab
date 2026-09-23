@@ -1,5 +1,21 @@
 # PiIO Lab
 
+## Mode reproduksi Nusapala Embedded
+
+Untuk pengujian masalah USB saat intercom aktif, gunakan mode baru
+**`piio-nusapala`**: PortAudio mikrofon/speaker persisten, panggilan WebRTC dari
+laptop, printer go-escpos/gousb, QR gousb, dan STI go-paymentreader.
+
+**[Panduan build, konfigurasi STI, dan panggilan laptop](docs/nusapala-lab.md)**
+
+Mode ini memakai `config.nusapala.json` dan membutuhkan Go 1.24+, CGO,
+libusb, PortAudio, serta libopus pada Raspberry Pi. Binary release lama dan
+`scripts/build-release.ps1` hanya untuk CLI lama. Build paket mode baru dengan
+`sh scripts/build-nusapala.sh` langsung pada Linux target.
+
+Dokumentasi berikut menjelaskan **CLI lama** (`go run main.go`, `config.json`)
+yang masih tersedia untuk pembanding driver kernel/arecord.
+
 PiIO Lab adalah aplikasi CLI berbasis Go untuk menguji, memantau, dan
 menginisialisasi ulang perangkat USB pada Raspberry Pi maupun komputer Linux
 x86-64.
@@ -267,7 +283,7 @@ jangan membagikan file log tanpa pemeriksaan.
   x86-64 (`amd64`).
 - Paket `alsa-utils` untuk `arecord`.
 - USB Sound Card dengan microphone input untuk BOYA BY-MM1+.
-- Go 1.22 atau lebih baru hanya diperlukan untuk instalasi dari source atau
+- Go 1.24 atau lebih baru hanya diperlukan untuk instalasi dari source atau
   melakukan build sendiri. Instalasi binary release tidak memerlukan Go.
 
 ### Persiapan sistem

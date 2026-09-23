@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PiIO · Nusapala Lab</title>
+<style>
+:root{color-scheme:dark;font:16px system-ui;background:#111827;color:#e5e7eb}body{max-width:1100px;margin:auto;padding:32px 20px}h1{margin-bottom:6px}p{color:#bac5d5;line-height:1.6}button,input{font:inherit;border-radius:8px;padding:12px;border:1px solid #475569}button{cursor:pointer;background:#38bdf8;color:#082f49;font-weight:650}button:disabled{opacity:.45;cursor:default}button.secondary{background:#334155;color:white}input{background:#111827;color:white;flex:1;min-width:180px}.panel,.device{background:#1e293b;border:1px solid #334155;padding:20px;border-radius:12px;margin-top:16px}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}#devices{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}.device{margin:0;overflow-wrap:anywhere}.device b{display:block;margin:8px 0}.state{color:#7dd3fc}.error{color:#fca5a5}#events{white-space:pre-wrap;font:13px ui-monospace,monospace;max-height:380px;overflow:auto;overflow-wrap:anywhere}#message{min-height:25px}small{color:#94a3b8}audio{width:100%;margin-top:14px}
+</style></head><body>
+<small>RASPBERRY PI · UJI PERANGKAT BERSAMAAN</small><h1>PiIO Nusapala Lab</h1>
+<p>Mikrofon dan speaker Pi tetap aktif saat idle. Mulai panggilan, scan QR, cetak, dan tap kartu untuk membandingkan error sebelum, selama, dan setelah panggilan.</p>
+<section class="panel"><div class="row"><button id="call">Panggil Raspberry Pi</button><button id="hangup" class="secondary" disabled>Akhiri panggilan</button><span id="callState">Belum tersambung</span></div><audio id="remote" autoplay controls></audio><p id="message" role="status"></p><small>Gunakan headset di laptop. Jika suara tidak otomatis terdengar, tekan Play pada pemutar di atas.</small></section>
+<section class="panel"><h2>Uji printer</h2><form id="printForm" class="row"><input id="printText" aria-label="Isi cetak" value="Tes cetak saat intercom aktif" maxlength="1000" required><button>Cetak tes</button></form><p>Scan QR juga masuk ke antrean cetak jika auto_print_qr aktif.</p></section>
+<section class="panel"><h2>Status perangkat</h2><p id="serverState">Menghubungkan…</p><div id="devices"></div></section>
+<section class="panel"><h2>Event terbaru</h2><pre id="events"></pre></section>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+let peer=null,stream=null,session='',heartbeat=null,busy=false,generation=0;
+async function api(path,body){const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(20000)});if(!response.ok)throw Error(await response.text());return response.status===202?null:response.json()}
+function message(text,error=false){$('message').textContent=text;$('message').className=error?'error':''}
+async function stop(notify=true){
+ generation++;const old=session;session='';clearInterval(heartbeat);heartbeat=null;
+ const oldPeer=peer;peer=null;if(oldPeer){oldPeer.onconnectionstatechange=null;oldPeer.close()}
+ if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+ $('remote').srcObject=null;busy=false;$('call').disabled=false;$('hangup').disabled=true;$('callState').textContent='Belum tersambung';
+ if(notify&&old){try{await api('/api/call/hangup',{id:old})}catch(e){message('Panggilan lokal berakhir; sesi Pi akan kedaluwarsa jika jaringan terputus.',true)}}
+}
+function gathered(pc){return new Promise((resolve,reject)=>{
+ if(pc.iceGatheringState==='complete'){resolve();return}
+ const timer=setTimeout(()=>{cleanup();reject(Error('ICE gathering timeout'))},12000);
+ function check(){if(pc.iceGatheringState==='complete'){cleanup();resolve()}}
+ function cleanup(){clearTimeout(timer);pc.removeEventListener('icegatheringstatechange',check)}
+ pc.addEventListener('icegatheringstatechange',check);
+})}
+$('call').onclick=async()=>{
+ if(busy)return;busy=true;const own=++generation;$('call').disabled=true;$('hangup').disabled=false;
+ try{
+  if(!navigator.mediaDevices?.getUserMedia)throw Error('Mikrofon browser membutuhkan HTTPS atau http://localhost:8080 melalui SSH tunnel.');
+  message('Meminta izin mikrofon laptop…');
+  const acquired=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},video:false});
+  if(own!==generation){acquired.getTracks().forEach(t=>t.stop());return}stream=acquired;
+  const pc=new RTCPeerConnection({iceServers:[]});peer=pc;
+  pc.ontrack=e=>{if(peer===pc){$('remote').srcObject=e.streams[0]||new MediaStream([e.track]);$('remote').play().catch(()=>message('Tekan Play untuk mendengar audio Pi.'))}};
+  pc.onconnectionstatechange=()=>{
+   if(peer!==pc)return;$('callState').textContent=pc.connectionState;
+   if(pc.connectionState==='connected')message('Panggilan aktif. Silakan uji QR, printer, dan STI.');
+   if(['failed','disconnected','closed'].includes(pc.connectionState))stop();
+  };
+  acquired.getTracks().forEach(t=>pc.addTrack(t,acquired));
+  const offer=await pc.createOffer();await pc.setLocalDescription(offer);await gathered(pc);
+  if(own!==generation)return;
+  message('Menghubungkan audio dengan Raspberry Pi…');
+  const result=await api('/api/call',pc.localDescription);
+  if(own!==generation){await api('/api/call/hangup',{id:result.id});return}
+  session=result.id;
+  await pc.setRemoteDescription(result.answer);
+  heartbeat=setInterval(async()=>{const id=session;if(!id)return;try{await api('/api/call/ping',{id})}catch(e){if(session===id){message('Sesi terputus: '+e.message,true);stop()}}},5000);
+ }catch(e){if(own===generation){await stop();message(e.message,true)}}
+};
+$('hangup').onclick=()=>stop();
+$('printForm').onsubmit=async e=>{e.preventDefault();try{await api('/api/print',{text:$('printText').value});message('Request masuk antrean. Hasil pengiriman terlihat di status printer.')}catch(e){message(e.message,true)}};
+async function refresh(){
+ try{
+  const response=await fetch('/api/status',{signal:AbortSignal.timeout(4000)});if(!response.ok)throw Error('HTTP '+response.status);const data=await response.json();
+  $('serverState').textContent='Terhubung · '+new Date().toLocaleTimeString();$('devices').replaceChildren();
+  for(const [name,d] of Object.entries(data.devices)){
+   const box=document.createElement('div');box.className='device';
+   const title=document.createElement('small');title.textContent=name.toUpperCase();
+   const state=document.createElement('b');state.className=d.state==='ERROR'?'error':'state';state.textContent=d.state;
+   const detail=document.createElement('div');detail.textContent=d.detail;
+   const count=document.createElement('p');count.textContent='Operasi berhasil: '+d.successes+' · Error: '+d.errors;
+   box.append(title,state,detail,count);$('devices').append(box);
+  }
+  $('events').textContent=data.events.slice().reverse().map(e=>new Date(e.at).toLocaleTimeString()+' ['+e.device+'] '+e.message).join('\n');
+ }catch(e){$('serverState').textContent='Server tidak terjangkau: '+e.message}
+ setTimeout(refresh,1500);
+}
+window.addEventListener('pagehide',()=>{if(session)fetch('/api/call/hangup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:session}),keepalive:true}).catch(()=>{});if(stream)stream.getTracks().forEach(t=>t.stop());if(peer)peer.close()});
+refresh();
+</script></body></html>
