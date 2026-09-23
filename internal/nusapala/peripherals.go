@@ -6,15 +6,18 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"strings"
 	"sync"
 	"time"
+
+	linuxio "piio-lab/internal/infrastructure/linux"
 
 	escpos "github.com/ABA-Developer/go-escpos"
 	logger "github.com/ABA-Developer/go-logger"
 	paymentreader "github.com/ABA-Developer/go-paymentreader"
 	"github.com/google/gousb"
-	linuxio "piio-lab/internal/infrastructure/linux"
 )
 
 type Peripherals struct {
@@ -127,11 +130,71 @@ func (p *Peripherals) scannerLoop(ctx context.Context) {
 		if ctx.Err() != nil {
 			return
 		}
+		if err != nil {
+			if fallbackErr := p.readScannerEventFallback(ctx); fallbackErr == nil {
+				continue
+			} else {
+				p.status.Result("scanner", fmt.Errorf("raw usb: %w; fallback: %v", err, fallbackErr), "")
+			}
+		}
 		p.status.Result("scanner", err, "")
 		if !pause(ctx, 2*time.Second) {
 			return
 		}
 	}
+}
+
+func (p *Peripherals) readScannerEventFallback(ctx context.Context) error {
+	path, err := findScannerEventPath()
+	if err != nil {
+		return err
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	p.status.Set("scanner", "READY", fmt.Sprintf("fallback %s (keyboard input)", path))
+	decoder := inputEventDecoder{pressed: map[uint16]bool{}}
+	buf := make([]byte, 24)
+	for ctx.Err() == nil {
+		if _, err := io.ReadFull(f, buf); err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
+			return err
+		}
+		ev, ok := decodeInputEvent(buf)
+		if !ok || ev.Type != EV_KEY {
+			continue
+		}
+		if s := decoder.Feed(ev, time.Now()); s != "" {
+			p.onQR(s)
+		}
+		if s := decoder.Flush(time.Now()); s != "" {
+			p.onQR(s)
+		}
+	}
+	return nil
+}
+
+func findScannerEventPath() (string, error) {
+	if entries, err := os.ReadDir("/dev/input/by-id"); err == nil {
+		for _, e := range entries {
+			name := strings.ToLower(e.Name())
+			if strings.Contains(name, "honeywell") || strings.Contains(name, "hf600") || strings.Contains(name, "hf680") || strings.Contains(name, "event-kbd") {
+				return "/dev/input/by-id/" + e.Name(), nil
+			}
+		}
+	}
+	if entries, err := os.ReadDir("/dev/input"); err == nil {
+		for _, e := range entries {
+			if strings.HasPrefix(e.Name(), "event") {
+				return "/dev/input/" + e.Name(), nil
+			}
+		}
+	}
+	return "", fmt.Errorf("scanner keyboard fallback tidak tersedia di /dev/input")
 }
 func (p *Peripherals) readScanner(ctx context.Context) error {
 	c := p.cfg.Scanner

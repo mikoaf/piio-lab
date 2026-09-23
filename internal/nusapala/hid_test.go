@@ -47,3 +47,27 @@ func TestQRShortReportAndLimit(t *testing.T) {
 		t.Fatal("oversized QR suffix printed")
 	}
 }
+
+func TestInputEventDecoderFallback(t *testing.T) {
+	d := inputEventDecoder{}
+	now := time.Now()
+	var got string
+	for _, ev := range []linuxInputEvent{
+		{Type: EV_KEY, Code: 30, Value: 1},
+		{Type: EV_KEY, Code: 30, Value: 0},
+		{Type: EV_KEY, Code: 48, Value: 1},
+		{Type: EV_KEY, Code: 48, Value: 0},
+		{Type: EV_KEY, Code: 28, Value: 1},
+		{Type: EV_KEY, Code: 28, Value: 0},
+	} {
+		if s := d.Feed(ev, now); s != "" {
+			got += s
+		}
+	}
+	if got != "ab" {
+		t.Fatalf("feed result=%q", got)
+	}
+	if s := d.Flush(now.Add(500 * time.Millisecond)); s != "" {
+		t.Fatalf("fallback=%q", s)
+	}
+}
