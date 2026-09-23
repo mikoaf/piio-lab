@@ -229,13 +229,18 @@ func (p *Peripherals) readScanner(ctx context.Context) error {
 		return err
 	}
 	p.status.Set("scanner", "READY", fmt.Sprintf("gousb %s:%s interface=%d endpoint=%d", c.VendorID, c.ProductID, c.Interface, c.Endpoint))
+	return p.readScannerReports(ctx, ep.ReadContext, ep.Desc.MaxPacketSize)
+}
+
+func (p *Peripherals) readScannerReports(ctx context.Context, read func(context.Context, []byte) (int, error), packetSize int) error {
 	decoder := hidDecoder{}
-	buf := make([]byte, ep.Desc.MaxPacketSize)
+	buf := make([]byte, packetSize)
 	for ctx.Err() == nil {
 		readCtx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
-		n, e := ep.ReadContext(readCtx, buf)
+		n, e := read(readCtx, buf)
+		expired := errors.Is(readCtx.Err(), context.DeadlineExceeded)
 		cancel()
-		if e != nil && !errors.Is(e, context.DeadlineExceeded) && !errors.Is(e, gousb.ErrorTimeout) {
+		if e != nil && !scannerReadIdle(e, expired) {
 			return e
 		}
 		if n > 0 {
@@ -248,6 +253,13 @@ func (p *Peripherals) readScanner(ctx context.Context) error {
 		p.onQR(decoder.Flush(time.Now()))
 	}
 	return ctx.Err()
+}
+
+func scannerReadIdle(err error, expired bool) bool {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, gousb.ErrorTimeout) || errors.Is(err, gousb.TransferTimedOut) {
+		return true
+	}
+	return expired && errors.Is(err, gousb.TransferCancelled)
 }
 func (p *Peripherals) onQR(value string) {
 	if value == "" {
